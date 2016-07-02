@@ -3,20 +3,18 @@ package mobi.stolicus.imageloading;
 import android.app.IntentService;
 import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.Matrix;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
 import java.io.File;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.io.FileOutputStream;
 
 /**
  * An {@link IntentService} subclass for handling asynchronous task requests in
  * a service on a separate handler thread.
- * <p/>
- * TODO: Customize class - update intent actions, extra parameters and static
- * helper methods.
  */
 public class ProcessingService extends IntentService {
 
@@ -26,10 +24,14 @@ public class ProcessingService extends IntentService {
 
     public static final String DOWNLOAD_STATUS = "DOWNLOAD_STATUS";
     public static final String DOWNLOAD_FILE_PATH = "DOWNLOAD_FILE_PATH";
+    public static final String DOWNLOAD_URL = "DOWNLOAD_URL";
     public static final String DOWNLOAD_STATUS_MESSAGE = "DOWNLOAD_STATUS_MESSAGE";
     private static final String TAG = "ProcessingService";
 
-    public static final int DOWNLOAD_STATUS_FAILED = -2; //failed downloading
+    public static final int DOWNLOAD_STATUS_FAILED_DOWNLOADING = -2;
+    public static final int DOWNLOAD_STATUS_FAILED_SCALING = -3;
+    public static final int DOWNLOAD_STATUS_FAILED_ROTATING = -4;
+    public static final int DOWNLOAD_STATUS_FAILED_SAVING = -5;
     public static final int DOWNLOAD_STATUS_FAILED_STARTING = -1; //failed preparing link
     public static final int DOWNLOAD_STATUS_SUCCESS = 1;
     public static final int DOWNLOAD_STATUS_CACHED = 0; //file with such url was already downloaded
@@ -43,7 +45,7 @@ public class ProcessingService extends IntentService {
         Log.i(TAG, "initiateDownload:" + query);
         Intent intent = new Intent(context, ProcessingService.class);
         intent.setAction(DOWNLOAD_START);
-        intent.setData(Uri.parse(query));
+        intent.putExtra(DOWNLOAD_URL, query);
         context.startService(intent);
     }
 
@@ -54,8 +56,7 @@ public class ProcessingService extends IntentService {
             final String action = intent.getAction();
             if (DOWNLOAD_START.equals(action)) {
                 Log.i(TAG, "onHandleIntent: handling starting of download: " + intent.toString());
-                final Uri param1 = intent.getData();
-                handleDownload(param1);
+                handleDownload(intent.getStringExtra(DOWNLOAD_URL));
             } else {
                 Log.d(TAG, "onHandleIntent: some other intent: " + intent.toString());
             }
@@ -66,27 +67,36 @@ public class ProcessingService extends IntentService {
      * Handle action Foo in the provided background thread with the provided
      * parameters.
      */
-    private void handleDownload(Uri uri) {
+    private void handleDownload(String url) {
 
         //on finishing download send broadcast
         Intent localIntent =
                 new Intent(ImageDownloadedReceiver.DOWNLOAD_DONE);
         localIntent.addCategory(Intent.CATEGORY_DEFAULT);
 
-        if (uri==null || uri.equals(Uri.EMPTY)){
+        if (url==null || url.equals("")){
             localIntent.putExtra(DOWNLOAD_STATUS, DOWNLOAD_STATUS_FAILED_STARTING);
         }else {
 
-            String filename = md5(uri.toString());
-            //TODO: check that external storage is available and save there
-            String downloadedFilePath = getApplicationContext().getFilesDir().getPath();
+            String filename = DownloadHelper.md5(url);
+
+            //Saving to cache directory of the app on external storage if available, or internal memory if not.
+            File file = getApplicationContext().getExternalCacheDir();
+            if (file==null) {
+                file = getApplicationContext().getCacheDir();
+            }
+
+            String downloadedFilePath = file.getPath();
             downloadedFilePath += "/" + filename + ".jpg";
 
+            Log.d(TAG, "handleDownload: will save to " + downloadedFilePath);
+
             if (checkFileExist(downloadedFilePath)){
+                Log.i(TAG, "handleDownload: file already cached " + downloadedFilePath);
                 localIntent.putExtra(DOWNLOAD_STATUS, DOWNLOAD_STATUS_CACHED);
             }else {
 
-                int result = startDownload(uri, downloadedFilePath);
+                int result = startDownload(url, downloadedFilePath);
                 localIntent.putExtra(DOWNLOAD_STATUS, result);
             }
             localIntent.putExtra(DOWNLOAD_FILE_PATH, downloadedFilePath);
@@ -101,29 +111,70 @@ public class ProcessingService extends IntentService {
         return file.exists() && file.length() > 0;
     }
 
-    private int startDownload(Uri uri, String downloadedFilePath) {
-        //TODO: return DOWNLOAD_STATUS_SUCCESS;
-
-        return DOWNLOAD_STATUS_FAILED;
+    public static int getScreenWidth() {
+        return Resources.getSystem().getDisplayMetrics().widthPixels;
     }
 
-    public String md5(String s) {
-        try {
-            // Create MD5 Hash
-            MessageDigest digest = java.security.MessageDigest.getInstance("MD5");
-            digest.update(s.getBytes());
-            byte messageDigest[] = digest.digest();
+    public static int getScreenHeight() {
+        return Resources.getSystem().getDisplayMetrics().heightPixels;
+    }
 
-            // Create Hex String
-            StringBuilder hexString = new StringBuilder();
-            for (byte aMessageDigest : messageDigest)
-                hexString.append(Integer.toHexString(0xFF & aMessageDigest));
+    public static int getMinimumScreenSize() {
+        int height = getScreenHeight();
+        int width = getScreenWidth();
+        return height>width?width:height;
 
-            return hexString.toString();
+    }
 
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
+    private int startDownload(String url, String downloadedFilePath) {
+        int minimumSize = getMinimumScreenSize();
+
+        Bitmap bitmap = DownloadHelper.downloadAndScaleImage(url, minimumSize, minimumSize);
+
+        if (bitmap==null){
+            return DOWNLOAD_STATUS_FAILED_DOWNLOADING;
+        }else{
+            Log.d(TAG, "startDownload: download ok.");
         }
-        return "";
+        bitmap = rotateBitmap(bitmap);
+        if (bitmap==null){
+            return DOWNLOAD_STATUS_FAILED_ROTATING;
+        }else{
+            Log.d(TAG, "startDownload: rotated ok");
+        }
+        int res = saveBitmap(bitmap, downloadedFilePath);
+        Log.d(TAG, "startDownload: saved " + res + "/ to " + downloadedFilePath);
+        return res;
     }
+
+    private Bitmap rotateBitmap(Bitmap bitmap) {
+        try {
+            Matrix m = new Matrix();
+            m.postRotate(180);
+            return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), m, true);
+        }catch (Exception e){
+            Log.e(TAG, "rotateBitmap: ", e);
+        }
+        return null;
+    }
+
+    private int saveBitmap(Bitmap bitmap, String downloadedFilePath) {
+        File file = new File (downloadedFilePath);
+        if (file.exists()) {
+            if (file.delete()){
+                Log.w(TAG, "saveBitmap: failed to delete file before saving." + downloadedFilePath);
+            }
+        }
+        try {
+            FileOutputStream out = new FileOutputStream(file);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
+            out.flush();
+            out.close();
+            return DOWNLOAD_STATUS_SUCCESS;
+        } catch (Exception e) {
+            Log.e(TAG, "saveBitmap: ", e);
+        }
+        return DOWNLOAD_STATUS_FAILED_SAVING;
+    }
+
 }

@@ -2,8 +2,9 @@ package mobi.stolicus.imageloading;
 
 /**
  * Created by shtolik on 02.07.2016.
+ * interface for passing results to activity
  */
-public interface DownloadDone {
+interface DownloadDone {
     void onImageLoaded(String path);
-    void onError(int status, String message);
+    void onError(String message);
 }

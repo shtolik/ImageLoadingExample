@@ -8,6 +8,8 @@ import android.os.Bundle;
 import android.support.design.widget.Snackbar;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.AppCompatButton;
+import android.support.v7.widget.AppCompatEditText;
 import android.support.v7.widget.AppCompatImageView;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
@@ -15,16 +17,19 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.TextView;
 
 import java.io.File;
 
 public class ScrollingActivity extends AppCompatActivity implements DownloadDone {
     private static final String TAG = "ScrollingActivity";
 
-    private SearchView searchView;
+    private SearchView mSearchView;
     private ImageDownloadedReceiver mDownloadStateReceiver = null;
     private IntentFilter mStatusIntentFilter = null;
-    private AppCompatImageView imageView = null;
+    private AppCompatImageView mImageView = null;
+    private AppCompatEditText mInput = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,7 +37,19 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
         setContentView(R.layout.activity_scrolling);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        imageView = (AppCompatImageView) findViewById(R.id.imageView);
+
+        mImageView = (AppCompatImageView) findViewById(R.id.imageView);
+        mInput = (AppCompatEditText) findViewById(R.id.linkInput);
+        AppCompatButton mButtonOk = (AppCompatButton) findViewById(R.id.buttonOk);
+        mButtonOk.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (mInput!=null) {
+                    String query = mInput.getText().toString();
+                    validateAndRequestDownload(query);
+                }
+            }
+        });
 
         // The filter's action is DOWNLOAD_START
         mStatusIntentFilter = new IntentFilter(
@@ -41,6 +58,7 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
         // Instantiates a new DownloadStateReceiver
         mDownloadStateReceiver =
                 new ImageDownloadedReceiver(this);
+
     }
 
     @Override
@@ -57,36 +75,34 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
             LocalBroadcastManager.getInstance(getApplicationContext()).unregisterReceiver(mDownloadStateReceiver);
     }
 
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.menu_scrolling, menu);
 
         final MenuItem myActionMenuItem = menu.findItem( R.id.action_search);
-        searchView = (SearchView) myActionMenuItem.getActionView();
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+        mSearchView = (SearchView) myActionMenuItem.getActionView();
+
+        //making search input allow pasting link
+        int searchTextViewId = mSearchView.getContext().getResources().getIdentifier("android:id/search_src_text", null, null);
+        TextView searchTextView = (TextView) mSearchView.findViewById(searchTextViewId);
+        if (searchTextView!=null)
+            searchTextView.setTextIsSelectable(true);
+        else{
+            EditText et = ((EditText) mSearchView.findViewById(R.id.search_src_text));
+            et.setTextIsSelectable(true);
+        }
+
+        mSearchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
-                searchView.clearFocus(); //to prevent double submission of data
-                if( ! searchView.isIconified()) {
-                    searchView.setIconified(true);
-                }
-//                myActionMenuItem.collapseActionView();
-
-                if (RequestHelper.validate(query)){
-                    Snackbar.make(searchView, getApplicationContext().getString(
-                                R.string.starting_image_loading, query),
-                            Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-                    ProcessingService.initiateDownload(getApplicationContext(), query);
-                }else{
-                    Snackbar.make(searchView, getApplicationContext().getString(
-                                R.string.not_valid_link, query)
-                            , Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-
+                mSearchView.clearFocus(); //to prevent double submission of data
+                if( ! mSearchView.isIconified()) {
+                    mSearchView.setIconified(true);
                 }
 
+                validateAndRequestDownload(query);
                 return false;
             }
 
@@ -98,13 +114,24 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
         return true;
     }
 
+    private void validateAndRequestDownload(String query) {
+        if (DownloadHelper.validate(query)){
+            updateImageView(null);
+            ProcessingService.initiateDownload(getApplicationContext(), query);
+        }else{
+            Snackbar.make(mImageView, getApplicationContext().getString(
+                    R.string.not_valid_link, query)
+                    , Snackbar.LENGTH_LONG)
+                    .show();
+        }
+    }
+
     @Override
     public void onImageLoaded(final String path) {
 
         Runnable run = new Runnable() {
             @Override
             public void run() {
-
                 updateImageView(path);
             }
         };
@@ -113,15 +140,15 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
     }
 
     @Override
-    public void onError(int status, final String message) {
+    public void onError(final String message) {
 
         Runnable run = new Runnable() {
             @Override
             public void run() {
-                Snackbar.make(searchView, getApplicationContext().getString(
-                        R.string.error_downloading, message)
+                Snackbar.make(mImageView, getApplicationContext().getString(
+                        R.string.error_fetching_image, message)
                         , Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+                        .show();
                 updateImageView(null);
             }
         };
@@ -130,7 +157,7 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
     }
 
     private void updateImageView(String path){
-        if (imageView!=null) {
+        if (mImageView !=null && path!=null) {
 
             try {
                 File imgFile = new File(path);
@@ -138,13 +165,13 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
                 if (imgFile.exists()) {
 
                     Bitmap myBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
-                    imageView.setImageBitmap(myBitmap);
-                    imageView.setVisibility(View.VISIBLE);
+                    mImageView.setImageBitmap(myBitmap);
+                    mImageView.setVisibility(View.VISIBLE);
                 }else{
-                    imageView.setVisibility(View.GONE);
+                    mImageView.setVisibility(View.GONE);
                 }
             }catch (Exception e){
-                imageView.setVisibility(View.GONE);
+                mImageView.setVisibility(View.GONE);
                 Log.e(TAG, "updateImageView: ", e);
             }
         }

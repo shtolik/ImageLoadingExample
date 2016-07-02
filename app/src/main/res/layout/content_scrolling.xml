@@ -9,11 +9,38 @@
     tools:context="mobi.stolicus.imageloading.ScrollingActivity"
     tools:showIn="@layout/activity_scrolling">
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <android.support.v7.widget.AppCompatEditText
+            android:id = "@+id/linkInput"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:longClickable="true"
+            android:textIsSelectable="true"
+            android:inputType="textUri"
+            android:visibility="visible"
+            android:layout_weight="1.0"/>
+        <android.support.v7.widget.AppCompatButton
+            android:id = "@+id/buttonOk"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.0"
+            android:text="@string/button_ok"
+            android:visibility="visible"/>
+    </LinearLayout>
     <android.support.v7.widget.AppCompatImageView
         android:id = "@+id/imageView"
-        android:src="@android:drawable/ic_input_add"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone"/>
+        android:layout_height="0dp"
+        android:layout_weight="1.0"
+        android:visibility="visible"/>
+
+    </LinearLayout>
 
 </android.support.v4.widget.NestedScrollView>
