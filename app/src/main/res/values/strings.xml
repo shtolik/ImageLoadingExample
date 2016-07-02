@@ -10,4 +10,6 @@
     <string name="failed_downloading">during downloading</string>
     <string name="failed_rotating">during rotation</string>
     <string name="failed_starting">during download initialization</string>
+    <string name="button_clear">X</string>
+    <string name="failed_loading">during loading</string>
 </resources>

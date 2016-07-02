@@ -3,7 +3,6 @@ package mobi.stolicus.imageloading;
 import android.app.IntentService;
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.support.v4.content.LocalBroadcastManager;
@@ -111,23 +110,8 @@ public class ProcessingService extends IntentService {
         return file.exists() && file.length() > 0;
     }
 
-    public static int getScreenWidth() {
-        return Resources.getSystem().getDisplayMetrics().widthPixels;
-    }
-
-    public static int getScreenHeight() {
-        return Resources.getSystem().getDisplayMetrics().heightPixels;
-    }
-
-    public static int getMinimumScreenSize() {
-        int height = getScreenHeight();
-        int width = getScreenWidth();
-        return height>width?width:height;
-
-    }
-
     private int startDownload(String url, String downloadedFilePath) {
-        int minimumSize = getMinimumScreenSize();
+        int minimumSize = DownloadHelper.getMinimumScreenSize();
 
         Bitmap bitmap = DownloadHelper.downloadAndScaleImage(url, minimumSize, minimumSize);
 
@@ -151,7 +135,10 @@ public class ProcessingService extends IntentService {
         try {
             Matrix m = new Matrix();
             m.postRotate(180);
-            return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), m, true);
+            Bitmap newBm =  Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), m, true);
+            //recycling old bitmap
+            bitmap.recycle();
+            return newBm;
         }catch (Exception e){
             Log.e(TAG, "rotateBitmap: ", e);
         }

@@ -1,5 +1,6 @@
 package mobi.stolicus.imageloading;
 
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Log;
@@ -21,6 +22,8 @@ public class DownloadHelper {
     private static final String TAG = "DownloadHelper";
 
     public static boolean validate(String query){
+        if (query==null)
+            return false;
         return query.startsWith("http://") || query.startsWith("https://");
     }
 
@@ -71,9 +74,10 @@ public class DownloadHelper {
                 stream = connection.getInputStream();
                 BufferedInputStream buffer = new BufferedInputStream(stream);
                 BitmapFactory.decodeStream(buffer, null, options);
-
+                Log.d(TAG, "downloadAndScaleImage: size =" + options.outWidth + "x" + options.outHeight);
                 options.inSampleSize = calculateInSampleSize(options, desiredWidth, desiredHeight);
                 Log.d(TAG, "downloadAndScaleImage: options.inSampleSize=" + options.inSampleSize);
+
 
                 //need to reset or close/reopen stream otherwise getting "Android: SkImageDecoder:: Factory returned null" on emulator
 //http://stackoverflow.com/questions/12006785/android-skimagedecoder-factory-returned-null
@@ -83,6 +87,7 @@ public class DownloadHelper {
                 return BitmapFactory.decodeStream(stream, null, options);
             }catch (IOException e){
                 //failed scaling down image. downloading it fully.
+                Log.w(TAG, "downloadAndScaleImage: failed scaling before downloading. Downloading full image. " + e.getMessage());
                 return downloadImage(imageUrl);
             }finally {
                 if (stream!=null)
@@ -155,8 +160,45 @@ public class DownloadHelper {
                 inSampleSize *= 2;
             }
         }
-
         return inSampleSize;
     }
 
+    public static Bitmap loadBitmap(String absolutePath) {
+
+        try {
+            //initial decoding just to find out image size
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            options.inSampleSize = 0;
+            BitmapFactory.decodeFile(absolutePath, options);
+
+            //checking resizing
+            int min = getMinimumScreenSize();
+            Log.d(TAG, "loadBitmap: size =" + options.outWidth + "x" + options.outHeight + ". Min size = " + min);
+            options.inSampleSize = calculateInSampleSize(options, min, min);
+            Log.d(TAG, "loadBitmap: options.inSampleSize=" + options.inSampleSize);
+
+            //actually loading
+            options.inJustDecodeBounds = false;
+            return BitmapFactory.decodeFile(absolutePath);
+        }catch (Exception e){
+            Log.e(TAG, "loadBitmap: ", e);
+        }
+        return null;
+    }
+
+    public static int getMinimumScreenSize() {
+        int height = getScreenHeight();
+        int width = getScreenWidth();
+        return height>width?width:height;
+
+    }
+
+    public static int getScreenHeight() {
+        return Resources.getSystem().getDisplayMetrics().heightPixels;
+    }
+
+    public static int getScreenWidth() {
+        return Resources.getSystem().getDisplayMetrics().widthPixels;
+    }
 }

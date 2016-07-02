@@ -3,7 +3,6 @@ package mobi.stolicus.imageloading;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.support.design.widget.Snackbar;
 import android.support.v4.content.LocalBroadcastManager;
@@ -22,8 +21,8 @@ import android.widget.TextView;
 
 import java.io.File;
 
-public class ScrollingActivity extends AppCompatActivity implements DownloadDone {
-    private static final String TAG = "ScrollingActivity";
+public class ImageActivity extends AppCompatActivity implements DownloadDone {
+    private static final String TAG = "ImageActivity";
 
     private SearchView mSearchView;
     private ImageDownloadedReceiver mDownloadStateReceiver = null;
@@ -47,6 +46,16 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
                 if (mInput!=null) {
                     String query = mInput.getText().toString();
                     validateAndRequestDownload(query);
+                }
+            }
+        });
+
+        AppCompatButton mButtonClear = (AppCompatButton) findViewById(R.id.buttonClear);
+        mButtonClear.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (mInput!=null) {
+                    mInput.setText("");
                 }
             }
         });
@@ -115,6 +124,9 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
     }
 
     private void validateAndRequestDownload(String query) {
+        if (query!=null){
+            query = query.trim();
+        }
         if (DownloadHelper.validate(query)){
             updateImageView(null);
             ProcessingService.initiateDownload(getApplicationContext(), query);
@@ -129,14 +141,23 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
     @Override
     public void onImageLoaded(final String path) {
 
-        Runnable run = new Runnable() {
-            @Override
-            public void run() {
-                updateImageView(path);
-            }
-        };
+        File imgFile = new File(path);
 
-        runOnUiThread(run);
+        if (imgFile.exists()) {
+            //loading image still in background thread
+            final Bitmap myBitmap = DownloadHelper.loadBitmap(imgFile.getAbsolutePath());
+            Runnable run = new Runnable() {
+                @Override
+                public void run() {
+                    updateImageView(myBitmap);
+                }
+            };
+            runOnUiThread(run);
+        }else{
+            onError(getApplicationContext().getString(R.string.failed_loading));
+        }
+
+
     }
 
     @Override
@@ -156,24 +177,18 @@ public class ScrollingActivity extends AppCompatActivity implements DownloadDone
         runOnUiThread(run);
     }
 
-    private void updateImageView(String path){
-        if (mImageView !=null && path!=null) {
+    private void updateImageView(Bitmap bitmap){
+        if (mImageView !=null && bitmap!=null) {
 
-            try {
-                File imgFile = new File(path);
+                if (bitmap!=null) {
+                        Log.d(TAG, "updateImageView: loaded image size =" + bitmap.getWidth() + "x" + bitmap.getHeight());
+                        mImageView.setImageBitmap(bitmap);
+                        mImageView.setVisibility(View.VISIBLE);
+                    }else{
+                        mImageView.setVisibility(View.GONE);
+                    }
 
-                if (imgFile.exists()) {
 
-                    Bitmap myBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
-                    mImageView.setImageBitmap(myBitmap);
-                    mImageView.setVisibility(View.VISIBLE);
-                }else{
-                    mImageView.setVisibility(View.GONE);
-                }
-            }catch (Exception e){
-                mImageView.setVisibility(View.GONE);
-                Log.e(TAG, "updateImageView: ", e);
-            }
         }
     }
 
