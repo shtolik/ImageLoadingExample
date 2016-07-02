@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.support.design.widget.Snackbar;
 import android.support.v4.content.LocalBroadcastManager;
+import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.AppCompatButton;
 import android.support.v7.widget.AppCompatEditText;
@@ -16,8 +17,6 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.EditText;
-import android.widget.TextView;
 
 import java.io.File;
 
@@ -91,18 +90,7 @@ public class ImageActivity extends AppCompatActivity implements DownloadDone {
         getMenuInflater().inflate(R.menu.menu_scrolling, menu);
 
         final MenuItem myActionMenuItem = menu.findItem( R.id.action_search);
-        mSearchView = (SearchView) myActionMenuItem.getActionView();
-
-        //making search input allow pasting link
-        int searchTextViewId = mSearchView.getContext().getResources().getIdentifier("android:id/search_src_text", null, null);
-        TextView searchTextView = (TextView) mSearchView.findViewById(searchTextViewId);
-        if (searchTextView!=null)
-            searchTextView.setTextIsSelectable(true);
-        else{
-            EditText et = ((EditText) mSearchView.findViewById(R.id.search_src_text));
-            et.setTextIsSelectable(true);
-        }
-
+        mSearchView = (SearchView) MenuItemCompat.getActionView(myActionMenuItem);
         mSearchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
@@ -178,17 +166,14 @@ public class ImageActivity extends AppCompatActivity implements DownloadDone {
     }
 
     private void updateImageView(Bitmap bitmap){
-        if (mImageView !=null && bitmap!=null) {
-
-                if (bitmap!=null) {
-                        Log.d(TAG, "updateImageView: loaded image size =" + bitmap.getWidth() + "x" + bitmap.getHeight());
-                        mImageView.setImageBitmap(bitmap);
-                        mImageView.setVisibility(View.VISIBLE);
-                    }else{
-                        mImageView.setVisibility(View.GONE);
-                    }
-
-
+        if (mImageView !=null) {
+            if (bitmap!=null) {
+                Log.d(TAG, "updateImageView: loaded image size =" + bitmap.getWidth() + "x" + bitmap.getHeight());
+                mImageView.setImageBitmap(bitmap);
+                mImageView.setVisibility(View.VISIBLE);
+            }else{
+                mImageView.setVisibility(View.GONE);
+            }
         }
     }
 

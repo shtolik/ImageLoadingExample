@@ -24,6 +24,8 @@ public class ProcessingService extends IntentService {
     public static final String DOWNLOAD_STATUS = "DOWNLOAD_STATUS";
     public static final String DOWNLOAD_FILE_PATH = "DOWNLOAD_FILE_PATH";
     public static final String DOWNLOAD_URL = "DOWNLOAD_URL";
+    private static final String ROTATION_ANGLE = "ROTATION_ANGLE";
+
     public static final String DOWNLOAD_STATUS_MESSAGE = "DOWNLOAD_STATUS_MESSAGE";
     private static final String TAG = "ProcessingService";
 
@@ -34,6 +36,9 @@ public class ProcessingService extends IntentService {
     public static final int DOWNLOAD_STATUS_FAILED_STARTING = -1; //failed preparing link
     public static final int DOWNLOAD_STATUS_SUCCESS = 1;
     public static final int DOWNLOAD_STATUS_CACHED = 0; //file with such url was already downloaded
+
+    private static final float DEFAULT_ROTATION_ANGLE = 180.0f;
+
 
 
     public ProcessingService() {
@@ -55,7 +60,8 @@ public class ProcessingService extends IntentService {
             final String action = intent.getAction();
             if (DOWNLOAD_START.equals(action)) {
                 Log.i(TAG, "onHandleIntent: handling starting of download: " + intent.toString());
-                handleDownload(intent.getStringExtra(DOWNLOAD_URL));
+                float rotationAngle = intent.getFloatExtra(ROTATION_ANGLE, DEFAULT_ROTATION_ANGLE);
+                handleDownload(intent.getStringExtra(DOWNLOAD_URL), rotationAngle);
             } else {
                 Log.d(TAG, "onHandleIntent: some other intent: " + intent.toString());
             }
@@ -66,7 +72,7 @@ public class ProcessingService extends IntentService {
      * Handle action Foo in the provided background thread with the provided
      * parameters.
      */
-    private void handleDownload(String url) {
+    private void handleDownload(String url, float rotationAngle) {
 
         //on finishing download send broadcast
         Intent localIntent =
@@ -95,7 +101,7 @@ public class ProcessingService extends IntentService {
                 localIntent.putExtra(DOWNLOAD_STATUS, DOWNLOAD_STATUS_CACHED);
             }else {
 
-                int result = startDownload(url, downloadedFilePath);
+                int result = startDownload(url, downloadedFilePath, rotationAngle);
                 localIntent.putExtra(DOWNLOAD_STATUS, result);
             }
             localIntent.putExtra(DOWNLOAD_FILE_PATH, downloadedFilePath);
@@ -105,22 +111,25 @@ public class ProcessingService extends IntentService {
         LocalBroadcastManager.getInstance(this).sendBroadcast(localIntent);
     }
 
+    /**
+     * @param path to file
+     * @return true if file exist at a given path and it's size > 0
+     */
     private boolean checkFileExist(String path) {
         File file = new File(path);
         return file.exists() && file.length() > 0;
     }
 
-    private int startDownload(String url, String downloadedFilePath) {
-        int minimumSize = DownloadHelper.getMinimumScreenSize();
+    private int startDownload(String url, String downloadedFilePath, float rotationAngle) {
 
-        Bitmap bitmap = DownloadHelper.downloadAndScaleImage(url, minimumSize, minimumSize);
+        Bitmap bitmap = DownloadHelper.downloadImage(url);
 
         if (bitmap==null){
             return DOWNLOAD_STATUS_FAILED_DOWNLOADING;
         }else{
             Log.d(TAG, "startDownload: download ok.");
         }
-        bitmap = rotateBitmap(bitmap);
+        bitmap = rotateBitmap(bitmap, rotationAngle);
         if (bitmap==null){
             return DOWNLOAD_STATUS_FAILED_ROTATING;
         }else{
@@ -131,10 +140,11 @@ public class ProcessingService extends IntentService {
         return res;
     }
 
-    private Bitmap rotateBitmap(Bitmap bitmap) {
+
+    private Bitmap rotateBitmap(Bitmap bitmap, float rotationAngle) {
         try {
             Matrix m = new Matrix();
-            m.postRotate(180);
+            m.postRotate(rotationAngle);
             Bitmap newBm =  Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), m, true);
             //recycling old bitmap
             bitmap.recycle();
