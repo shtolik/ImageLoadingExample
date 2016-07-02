@@ -90,4 +90,9 @@
         "when a user tries to pick up one of cards.\n\n"
     </string>
     <string name="action_settings">Settings</string>
+    <string name="search">Search</string>
+    <string name="not_valid_link">Entered text doesn\'t look like a valid link: %1$s</string>
+    <string name="starting_image_loading">Starting to load image from link: %1$s</string>
+    <string name="error_downloading">Downloading failed: %1$s</string>
+    <string name="downloaded">Image downloaded</string>
 </resources>

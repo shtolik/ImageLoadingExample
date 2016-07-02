@@ -9,10 +9,11 @@
     tools:context="mobi.stolicus.imageloading.ScrollingActivity"
     tools:showIn="@layout/activity_scrolling">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="@dimen/text_margin"
-        android:text="@string/large_text"/>
+    <android.support.v7.widget.AppCompatImageView
+        android:id = "@+id/imageView"
+        android:src="@android:drawable/ic_input_add"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"/>
 
 </android.support.v4.widget.NestedScrollView>
